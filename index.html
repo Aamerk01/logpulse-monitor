@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LogPulse — AI-Powered Log Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg0: #ffffff;
+  --bg1: #f6f8fa;
+  --bg2: #eef2f6;
+  --bg3: #e6ebf1;
+
+  --border: #d0d7de;
+  --border2: #c5ccd3;
+
+  --text0: #0d1117;
+  --text1: #57606a;
+  --text2: #8c959f;
+
+  --green: #2da44e;
+  --green-dim: rgba(45,164,78,0.12);
+
+  --yellow: #bf8700;
+  --yellow-dim: rgba(191,135,0,0.12);
+
+  --red: #cf222e;
+  --red-dim: rgba(207,34,46,0.12);
+
+  --blue: #0969da;
+  --blue-dim: rgba(9,105,218,0.10);
+
+  --orange: #bc4c00;
+  --purple: #8250df;
+
+  --accent: #0969da;
+  --accent-bright: #1f6feb;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--bg0);
+  color: var(--text0);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* ── LAYOUT ── */
+.app {
+  display: grid;
+  grid-template-rows: 48px 1fr;
+  grid-template-columns: 260px 1fr 300px;
+  height: 100vh;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  grid-column: 1 / -1;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 20px;
+  border-right: 1px solid var(--border);
+  margin-right: 20px;
+}
+
+.logo-icon {
+  width: 28px; height: 28px;
+  background: var(--accent);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+
+.logo-text {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.3px;
+  color: var(--text0);
+}
+
+.logo-text span { color: var(--accent-bright); }
+
+.topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.meta-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text1);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: blink 2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.alert-chip {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: all 0.4s;
+  background: var(--bg2);
+  border-color: var(--border);
+  color: var(--text1);
+}
+
+.alert-chip.firing {
+  background: var(--red-dim);
+  border-color: var(--red);
+  color: var(--red);
+  animation: alertPulse 1.5s infinite;
+}
+
+.alert-chip.ok {
+  background: var(--green-dim);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+@keyframes alertPulse {
+  0%,100%{ box-shadow: 0 0 0 0 rgba(248,81,73,0); }
+  50%{ box-shadow: 0 0 0 4px rgba(248,81,73,0.2); }
+}
+
+.topbar-time {
+  font-size: 11px;
+  color: var(--text2);
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+}
+
+/* ── SIDEBAR LEFT ── */
+.sidebar-left {
+  background: var(--bg1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-section {
+  border-bottom: 1px solid var(--border);
+  padding: 14px;
+}
+
+.section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text2);
+  margin-bottom: 10px;
+}
+
+/* Webhook config */
+.webhook-input {
+  width: 100%;
+  background: var(--bg0);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 7px 10px;
+  color: var(--text0);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  outline: none;
+  transition: border-color 0.2s;
+  margin-bottom: 8px;
+}
+.webhook-input:focus { border-color: var(--accent-bright); }
+.webhook-input::placeholder { color: var(--text2); }
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.config-label { font-size: 10px; color: var(--text1); min-width: 70px; }
+
+.config-select, .config-range {
+  flex: 1;
+  background: var(--bg0);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 5px 8px;
+  color: var(--text0);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  outline: none;
+}
+
+.config-val { font-size: 10px; color: var(--accent-bright); min-width: 26px; text-align: right; }
+
+/* Source selector */
+.source-list { display: flex; flex-direction: column; gap: 4px; }
+
+.source-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+  font-size: 11px;
+  color: var(--text1);
+}
+.source-item:hover { background: var(--bg2); }
+.source-item.active {
+  background: var(--blue-dim);
+  border-color: rgba(88,166,255,0.25);
+  color: var(--text0);
+}
+
+.source-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.source-count {
+  margin-left: auto;
+  font-size: 10px;
+  background: var(--bg3);
+  padding: 1px 6px;
+  border-radius: 10px;
+  color: var(--text1);
+}
+
+/* Controls */
+.btn-row { display: flex; gap: 6px; }
+
+.btn {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  color: var(--text0);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.btn:hover { background: var(--bg3); border-color: var(--text2); }
+
+.btn-start {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.btn-start:hover { background: var(--accent-bright); border-color: var(--accent-bright); }
+.btn-start:disabled { background: var(--bg3); border-color: var(--border); color: var(--text2); cursor: not-allowed; }
+
+.btn-stop {
+  border-color: var(--red);
+  color: var(--red);
+  display: none;
+}
+.btn-stop:hover { background: var(--red-dim); }
+
+.inject-btns { display: flex; gap: 4px; margin-top: 8px; }
+.btn-inject {
+  flex: 1;
+  padding: 5px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.btn-inject-e { color: var(--red); border-color: rgba(248,81,73,0.3); }
+.btn-inject-e:hover { background: var(--red-dim); border-color: var(--red); }
+.btn-inject-w { color: var(--yellow); border-color: rgba(210,153,34,0.3); }
+.btn-inject-w:hover { background: var(--yellow-dim); border-color: var(--yellow); }
+.btn-inject-i { color: var(--blue); border-color: rgba(88,166,255,0.3); }
+.btn-inject-i:hover { background: var(--blue-dim); border-color: var(--blue); }
+.btn-inject-b { color: var(--orange); border-color: rgba(227,179,65,0.3); }
+.btn-inject-b:hover { background: rgba(227,179,65,0.1); border-color: var(--orange); }
+
+/* Stats mini */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.stat-box {
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.stat-num {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+.stat-num.e { color: var(--red); }
+.stat-num.w { color: var(--yellow); }
+.stat-num.i { color: var(--blue); }
+.stat-num.t { color: var(--text0); }
+
+.stat-name { font-size: 9px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; }
+
+/* Threshold */
+.threshold-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.threshold-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--green);
+  transition: width 0.5s, background 0.3s;
+}
+
+.threshold-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--text2);
+  margin-top: 4px;
+}
+
+/* ── MAIN PANEL ── */
+.main-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg0);
+}
+
+/* Toolbar */
+.log-toolbar {
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.filter-btns { display: flex; gap: 4px; }
+.filter-btn {
+  padding: 3px 10px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  color: var(--text1);
+  transition: all 0.15s;
+}
+.filter-btn:hover { background: var(--bg2); color: var(--text0); }
+.filter-btn.active-all { background: var(--bg2); border-color: var(--border2); color: var(--text0); }
+.filter-btn.active-e { background: var(--red-dim); border-color: rgba(248,81,73,0.4); color: var(--red); }
+.filter-btn.active-w { background: var(--yellow-dim); border-color: rgba(210,153,34,0.4); color: var(--yellow); }
+.filter-btn.active-i { background: var(--blue-dim); border-color: rgba(88,166,255,0.4); color: var(--blue); }
+
+.search-input {
+  flex: 1;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 10px;
+  color: var(--text0);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  outline: none;
+}
+.search-input:focus { border-color: var(--border2); }
+.search-input::placeholder { color: var(--text2); }
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text2);
+}
+
+.btn-clear-log {
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text1);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  cursor: pointer;
+}
+.btn-clear-log:hover { background: var(--bg2); color: var(--text0); }
+
+/* Log table header */
+.log-header {
+  display: grid;
+  grid-template-columns: 80px 68px 140px 1fr 80px 70px;
+  gap: 0;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 14px;
+  font-size: 10px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  flex-shrink: 0;
+}
+
+/* Log stream */
+.log-stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.log-stream::-webkit-scrollbar { width: 4px; }
+.log-stream::-webkit-scrollbar-track { background: transparent; }
+.log-stream::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.log-row {
+  display: grid;
+  grid-template-columns: 80px 68px 140px 1fr 80px 70px;
+  gap: 0;
+  padding: 4px 14px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  font-size: 11px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: background 0.1s;
+  animation: rowIn 0.2s ease;
+}
+.log-row:hover { background: var(--bg2); }
+.log-row.row-e { border-left: 2px solid var(--red); }
+.log-row.row-w { border-left: 2px solid var(--yellow); }
+.log-row.row-i { border-left: 2px solid transparent; }
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.col-time { color: var(--text2); font-size: 10px; align-self: center; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  align-self: center;
+  width: fit-content;
+}
+.badge-ERROR { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,81,73,0.25); }
+.badge-WARNING { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(210,153,34,0.25); }
+.badge-INFO { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(88,166,255,0.2); }
+
+.col-service { color: var(--purple); font-size: 10px; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
+.col-message { color: var(--text0); align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
+.col-sent { font-size: 10px; align-self: center; }
+.sent-ok { color: var(--green); }
+.sent-err { color: var(--red); }
+.sent-pending { color: var(--text2); }
+.col-id { color: var(--text2); font-size: 10px; align-self: center; }
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: var(--text2);
+}
+
+.empty-ascii {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--border2);
+  text-align: center;
+}
+
+.empty-hint { font-size: 11px; color: var(--text2); }
+
+/* ── SIDEBAR RIGHT ── */
+.sidebar-right {
+  background: var(--bg1);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.right-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.rtab {
+  flex: 1;
+  padding: 10px 8px;
+  font-size: 10px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text2);
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.rtab:hover { color: var(--text1); }
+.rtab.active { color: var(--accent-bright); border-bottom-color: var(--accent-bright); }
+
+.right-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.right-content::-webkit-scrollbar { width: 3px; }
+.right-content::-webkit-scrollbar-thumb { background: var(--border); }
+
+/* AI Analysis panel */
+.ai-empty {
+  text-align: center;
+  color: var(--text2);
+  font-size: 11px;
+  padding: 30px 0;
+  line-height: 1.8;
+}
+
+.ai-card {
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+  animation: rowIn 0.3s ease;
+}
+
+.ai-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-card-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-bright);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.ai-card-time { font-size: 9px; color: var(--text2); }
+
+.severity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.sev-CRITICAL { background: rgba(248,81,73,0.2); color: var(--red); border: 1px solid rgba(248,81,73,0.4); }
+.sev-HIGH { background: rgba(210,153,34,0.2); color: var(--yellow); border: 1px solid rgba(210,153,34,0.4); }
+.sev-MEDIUM { background: rgba(88,166,255,0.15); color: var(--blue); border: 1px solid rgba(88,166,255,0.3); }
+.sev-LOW { background: var(--green-dim); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+
+.ai-text {
+  font-size: 11px;
+  color: var(--text1);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.ai-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text2);
+  padding: 12px 0;
+}
+
+.spinner {
+  width: 12px; height: 12px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent-bright);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* n8n flow panel */
+.flow-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flow-node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+  transition: all 0.3s;
+}
+
+.flow-node.active {
+  border-color: var(--accent);
+  background: var(--blue-dim);
+}
+
+.flow-node.done {
+  border-color: rgba(63,185,80,0.3);
+  background: var(--green-dim);
+}
+
+.flow-node.error {
+  border-color: rgba(248,81,73,0.3);
+  background: var(--red-dim);
+}
+
+.flow-icon { font-size: 14px; flex-shrink: 0; }
+.flow-name { flex: 1; color: var(--text1); }
+.flow-node.active .flow-name { color: var(--text0); }
+.flow-node.done .flow-name { color: var(--green); }
+.flow-node.error .flow-name { color: var(--red); }
+
+.flow-status { font-size: 9px; color: var(--text2); }
+.flow-node.active .flow-status { color: var(--accent-bright); }
+.flow-node.done .flow-status { color: var(--green); }
+
+.flow-arrow {
+  text-align: center;
+  color: var(--text2);
+  font-size: 10px;
+  line-height: 1;
+  padding: 1px 0;
+}
+
+/* Timeline */
+.timeline { display: flex; flex-direction: column; gap: 0; }
+.tl-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+}
+.tl-time { color: var(--text2); min-width: 55px; flex-shrink: 0; }
+.tl-msg { color: var(--text1); flex: 1; line-height: 1.5; }
+.tl-ok { color: var(--green); }
+.tl-err { color: var(--red); }
+.tl-warn { color: var(--yellow); }
+
+/* Response indicator */
+.res-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  margin-bottom: 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text1);
+  transition: all 0.3s;
+}
+.res-indicator.ok { background: var(--green-dim); border-color: rgba(63,185,80,0.3); color: var(--green); }
+.res-indicator.err { background: var(--red-dim); border-color: rgba(248,81,73,0.3); color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ── TOPBAR ── -->
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-text">Log<span>Pulse</span></div>
+    </div>
+
+    <div class="topbar-meta">
+      <div class="meta-chip">
+        <div class="live-dot" id="liveDot" style="background:var(--text2)"></div>
+        <span id="liveLabel">IDLE</span>
+      </div>
+      <div class="meta-chip" id="rateChip">0 logs/min</div>
+      <div class="meta-chip" id="totalChip">0 total</div>
+      <div class="meta-chip" id="srcChip">source: —</div>
+    </div>
+
+    <div class="alert-chip" id="alertChip">
+      <span id="alertChipIcon">○</span>
+      <span id="alertChipText">No alerts</span>
+    </div>
+
+    <div class="topbar-time" id="clock">—</div>
+  </div>
+
+  <!-- ── SIDEBAR LEFT ── -->
+  <div class="sidebar-left">
+
+    <!-- Webhook config -->
+    <div class="sidebar-section">
+      <div class="section-label">n8n Webhook</div>
+      <input class="webhook-input" id="webhookUrl"
+        placeholder="https://…n8n.cloud/webhook-test/…"
+        type="text" />
+
+      <div class="config-row">
+        <span class="config-label">Interval</span>
+        <input type="range" class="config-range" id="cfgInterval" min="1" max="10" value="3"
+          oninput="document.getElementById('cfgIntervalVal').textContent=this.value+'s'">
+        <span class="config-val" id="cfgIntervalVal">3s</span>
+      </div>
+
+      <div class="config-row">
+        <span class="config-label">Error threshold</span>
+        <input type="range" class="config-range" id="cfgThreshold" min="1" max="15" value="3"
+          oninput="document.getElementById('cfgThresholdVal').textContent=this.value;updateThresholdBar()">
+        <span class="config-val" id="cfgThresholdVal">3</span>
+      </div>
+
+      <div class="config-row">
+        <span class="config-label">Mode</span>
+        <select class="config-select" id="cfgMode">
+          <option value="realistic">Realistic</option>
+          <option value="stress">Stress test</option>
+          <option value="calm">Calm</option>
+          <option value="spike">Error spike</option>
+        </select>
+      </div>
+
+      <div class="btn-row" style="margin-top:4px">
+        <button class="btn btn-start" id="btnStart" onclick="startSim()">▶ Start</button>
+        <button class="btn btn-stop" id="btnStop" onclick="stopSim()">■ Stop</button>
+      </div>
+
+      <div class="inject-btns">
+        <button class="btn-inject btn-inject-e" onclick="injectLog('ERROR')">ERR</button>
+        <button class="btn-inject btn-inject-w" onclick="injectLog('WARNING')">WARN</button>
+        <button class="btn-inject btn-inject-i" onclick="injectLog('INFO')">INFO</button>
+        <button class="btn-inject btn-inject-b" onclick="injectBatch()">BATCH×5</button>
+      </div>
+    </div>
+
+    <!-- Sources -->
+    <div class="sidebar-section">
+      <div class="section-label">Log Sources</div>
+      <div class="source-list" id="sourceList">
+        <div class="source-item active" data-src="all" onclick="filterSource('all',this)">
+          <div class="source-dot" style="background:var(--blue)"></div>
+          All sources
+          <span class="source-count" id="cnt-all">0</span>
+        </div>
+        <div class="source-item" data-src="api-gateway" onclick="filterSource('api-gateway',this)">
+          <div class="source-dot" style="background:var(--green)"></div>
+          api-gateway
+          <span class="source-count" id="cnt-api-gateway">0</span>
+        </div>
+        <div class="source-item" data-src="payment-service" onclick="filterSource('payment-service',this)">
+          <div class="source-dot" style="background:var(--red)"></div>
+          payment-service
+          <span class="source-count" id="cnt-payment-service">0</span>
+        </div>
+        <div class="source-item" data-src="database" onclick="filterSource('database',this)">
+          <div class="source-dot" style="background:var(--yellow)"></div>
+          database
+          <span class="source-count" id="cnt-database">0</span>
+        </div>
+        <div class="source-item" data-src="auth-service" onclick="filterSource('auth-service',this)">
+          <div class="source-dot" style="background:var(--purple)"></div>
+          auth-service
+          <span class="source-count" id="cnt-auth-service">0</span>
+        </div>
+        <div class="source-item" data-src="worker" onclick="filterSource('worker',this)">
+          <div class="source-dot" style="background:var(--orange)"></div>
+          worker
+          <span class="source-count" id="cnt-worker">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="sidebar-section" style="flex:1">
+      <div class="section-label">Metrics</div>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-num t" id="statTotal">0</div><div class="stat-name">Total</div></div>
+        <div class="stat-box"><div class="stat-num e" id="statError">0</div><div class="stat-name">Errors</div></div>
+        <div class="stat-box"><div class="stat-num w" id="statWarn">0</div><div class="stat-name">Warnings</div></div>
+        <div class="stat-box"><div class="stat-num i" id="statInfo">0</div><div class="stat-name">Info</div></div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div class="threshold-labels">
+          <span>Error threshold</span>
+          <span id="thresholdRatio" style="color:var(--accent-bright)">0/3</span>
+        </div>
+        <div class="threshold-track">
+          <div class="threshold-fill" id="thresholdFill" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── MAIN PANEL ── -->
+  <div class="main-panel">
+
+    <div class="log-toolbar">
+      <div class="filter-btns">
+        <button class="filter-btn active-all" id="fbAll" onclick="setFilter('ALL',this)">ALL</button>
+        <button class="filter-btn" id="fbErr" onclick="setFilter('ERROR',this)">ERROR</button>
+        <button class="filter-btn" id="fbWarn" onclick="setFilter('WARNING',this)">WARN</button>
+        <button class="filter-btn" id="fbInfo" onclick="setFilter('INFO',this)">INFO</button>
+      </div>
+      <input class="search-input" id="searchInput" placeholder="Search messages, services…" oninput="renderLogs()">
+      <div class="toolbar-right">
+        <span id="visibleCount">0 events</span>
+        <button class="btn-clear-log" onclick="clearAll()">Clear</button>
+      </div>
+    </div>
+
+    <div class="log-header">
+      <span>Timestamp</span>
+      <span>Level</span>
+      <span>Service</span>
+      <span>Message</span>
+      <span>Webhook</span>
+      <span>ID</span>
+    </div>
+
+    <div class="log-stream" id="logStream">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-ascii">
+┌─────────────────────────────┐<br>
+│  No log events yet          │<br>
+│                             │<br>
+│  Configure your webhook     │<br>
+│  URL and press Start        │<br>
+│  — or inject logs manually  │<br>
+└─────────────────────────────┘
+        </div>
+        <div class="empty-hint">Powered by n8n + OpenAI</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── SIDEBAR RIGHT ── -->
+  <div class="sidebar-right">
+    <div class="right-tabs">
+      <div class="rtab active" id="tab-ai" onclick="switchTab('ai')">AI Analysis</div>
+      <div class="rtab" id="tab-flow" onclick="switchTab('flow')">n8n Flow</div>
+      <div class="rtab" id="tab-timeline" onclick="switchTab('timeline')">Timeline</div>
+    </div>
+
+    <!-- AI tab -->
+    <div class="right-content" id="content-ai">
+      <div class="ai-empty" id="aiEmpty">
+        ⚡ AI analysis will appear<br>here when an alert fires<br><br>
+        <span style="font-size:10px;color:var(--text2)">
+          Threshold: <span id="aiThresholdHint">3</span> errors<br>
+          → sends logs to OpenAI<br>
+          → emails summary
+        </span>
+      </div>
+      <div id="aiCards"></div>
+    </div>
+
+    <!-- Flow tab -->
+    <div class="right-content" id="content-flow" style="display:none">
+      <div class="flow-diagram" id="flowDiagram">
+        <div class="flow-node" id="fn-webhook">
+          <span class="flow-icon">🔗</span>
+          <span class="flow-name">Webhook</span>
+          <span class="flow-status" id="fs-webhook">waiting</span>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" id="fn-code">
+          <span class="flow-icon">{}</span>
+          <span class="flow-name">Code — Analyze</span>
+          <span class="flow-status" id="fs-code">idle</span>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" id="fn-if">
+          <span class="flow-icon">⚑</span>
+          <span class="flow-name">Should Alert?</span>
+          <span class="flow-status" id="fs-if">idle</span>
+        </div>
+        <div class="flow-arrow">↓ (true)</div>
+        <div class="flow-node" id="fn-openai">
+          <span class="flow-icon">🤖</span>
+          <span class="flow-name">OpenAI Analysis</span>
+          <span class="flow-status" id="fs-openai">idle</span>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" id="fn-gmail">
+          <span class="flow-icon">✉</span>
+          <span class="flow-name">Gmail Alert</span>
+          <span class="flow-status" id="fs-gmail">idle</span>
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <div class="section-label" style="margin-bottom:8px">Last webhook response</div>
+        <div class="res-indicator" id="resIndicator">
+          <span>○</span> <span id="resText">No request sent yet</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline tab -->
+    <div class="right-content" id="content-timeline" style="display:none">
+      <div class="timeline" id="timeline">
+        <div style="color:var(--text2);font-size:11px;text-align:center;padding:20px 0">
+          Activity timeline will appear here
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────
+const SOURCES = {
+  'api-gateway':      { color: 'var(--green)', events: [
+    ['ERROR','Rate limit exceeded for IP {ip}'],
+    ['ERROR','Upstream timeout after 30s — /api/orders'],
+    ['WARNING','Slow response: {ms}ms on POST /checkout'],
+    ['WARNING','SSL certificate expires in {n} days'],
+    ['INFO','Request routed to backend-{n}'],
+    ['INFO','Health check passed'],
+  ]},
+  'payment-service':  { color: 'var(--red)', events: [
+    ['ERROR','Stripe charge failed — card_declined #{id}'],
+    ['ERROR','Payment gateway timeout — txn #{id}'],
+    ['ERROR','Invalid CVV for order #{id}'],
+    ['WARNING','Retry attempt {n}/3 for payment #{id}'],
+    ['INFO','Payment #{id} processed successfully'],
+    ['INFO','Refund issued for order #{id}'],
+  ]},
+  'database':         { color: 'var(--yellow)', events: [
+    ['ERROR','Connection pool exhausted (50/50)'],
+    ['ERROR','Deadlock detected on table orders'],
+    ['ERROR','Replication lag: {ms}ms — replica-02'],
+    ['WARNING','Slow query: {ms}ms — SELECT * FROM users'],
+    ['WARNING','Table users approaching size limit (85%)'],
+    ['INFO','Vacuum completed on table sessions'],
+    ['INFO','Backup completed — {ms}ms'],
+  ]},
+  'auth-service':     { color: 'var(--purple)', events: [
+    ['ERROR','JWT signature invalid for user #{id}'],
+    ['ERROR','Brute force detected — IP {ip} blocked'],
+    ['WARNING','Token expiring soon for session #{id}'],
+    ['INFO','User #{id} authenticated via OAuth'],
+    ['INFO','Password reset email sent to user #{id}'],
+  ]},
+  'worker':           { color: 'var(--orange)', events: [
+    ['ERROR','Job #{id} failed after 3 retries'],
+    ['ERROR','Queue overflow — dropping messages'],
+    ['WARNING','Job queue depth: {n} (high)'],
+    ['INFO','Batch job completed: {n} records processed'],
+    ['INFO','Scheduled task "cleanup" finished in {ms}ms'],
+  ]},
+};
+
+const MODES = {
+  realistic: [['ERROR',2],['WARNING',3],['INFO',5]],
+  stress:    [['ERROR',6],['WARNING',2],['INFO',2]],
+  calm:      [['ERROR',0],['WARNING',1],['INFO',9]],
+  spike:     [['ERROR',8],['WARNING',1],['INFO',1]],
+};
+
+let logs = [];
+let stats = {ERROR:0, WARNING:0, INFO:0};
+let sourceCounts = {};
+let simInterval = null;
+let logIdCounter = 0;
+let currentFilter = 'ALL';
+let currentSource = 'all';
+let aiAnalyses = [];
+let timelineEvents = [];
+let logsPerMin = 0;
+let logsLastMinute = [];
+
+function rnd(n) { return Math.floor(Math.random() * n); }
+function randId() { return (rnd(9000)+1000); }
+function randIp() { return `10.${rnd(255)}.${rnd(255)}.${rnd(99)}`; }
+function randMs() { return (rnd(4500)+200); }
+function randN() { return (rnd(98)+2); }
+function fmt(str) {
+  return str.replace('{id}', randId()).replace('{ip}', randIp())
+    .replace('{ms}', randMs()).replace('{n}', randN());
+}
+
+function pickFromMode(modeName) {
+  const weights = MODES[modeName] || MODES.realistic;
+  const pool = [];
+  weights.forEach(([lvl, w]) => { for(let i=0;i<w;i++) pool.push(lvl); });
+  return pool[rnd(pool.length)];
+}
+
+function makeLog(forceLevel, forceService) {
+  const mode = document.getElementById('cfgMode').value;
+  const level = forceLevel || pickFromMode(mode);
+  const srcKeys = Object.keys(SOURCES);
+  const service = forceService || srcKeys[rnd(srcKeys.length)];
+  const pool = SOURCES[service].events.filter(e => e[0] === level);
+  const fallbackPool = SOURCES[service].events;
+  const tpl = pool.length ? pool[rnd(pool.length)] : fallbackPool[rnd(fallbackPool.length)];
+  return {
+    id: ++logIdCounter,
+    timestamp: new Date().toISOString(),
+    level: tpl[0],
+    service,
+    message: fmt(tpl[1]),
+    sent: 'pending'
+  };
+}
+
+// ── WEBHOOK ──────────────────────────────────────────────────
+async function sendWebhook(logsToSend) {
+  const url = document.getElementById('webhookUrl').value.trim();
+  if (!url) return null;
+
+  animateFlow('webhook', 'active', 'sending…');
+  animateFlow('code', 'active', 'processing…');
+
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ logs: logsToSend })
+    });
+    const ok = r.ok || r.status === 200;
+    updateResIndicator(ok, r.status);
+    animateFlow('webhook', 'done', `${r.status}`);
+    animateFlow('code', 'done', 'done');
+
+    const errCount = logsToSend.filter(l=>l.level==='ERROR').length;
+    const threshold = parseInt(document.getElementById('cfgThreshold').value);
+
+    if (errCount >= threshold) {
+      animateFlow('if', 'done', 'true → alert!');
+      animateFlow('openai', 'active', 'analyzing…');
+      addTimeline('🚨 Alert triggered — sent to OpenAI', 'err');
+      setTimeout(()=>{ animateFlow('openai','done','done'); animateFlow('gmail','active','sending…'); }, 2000);
+      setTimeout(()=>{ animateFlow('gmail','done','sent ✓'); addTimeline('✉ Email alert sent via Gmail','ok'); }, 3500);
+      addFakeAiAnalysis(logsToSend);
+    } else {
+      animateFlow('if', 'done', 'false — no alert');
+    }
+
+    addTimeline(`↑ ${logsToSend.length} log(s) sent — ${r.status}`, ok ? 'ok' : 'err');
+    return ok;
+  } catch(e) {
+    updateResIndicator(false, e.message);
+    animateFlow('webhook', 'error', 'failed');
+    addTimeline(`✗ Webhook error: ${e.message}`, 'err');
+    return false;
+  }
+}
+
+function updateResIndicator(ok, detail) {
+  const el = document.getElementById('resIndicator');
+  const txt = document.getElementById('resText');
+  el.className = 'res-indicator ' + (ok ? 'ok' : 'err');
+  txt.textContent = ok ? `✓ ${detail} — webhook received` : `✗ ${detail}`;
+}
+
+// ── FLOW ANIMATION ────────────────────────────────────────────
+function animateFlow(node, state, statusText) {
+  const el = document.getElementById('fn-'+node);
+  const st = document.getElementById('fs-'+node);
+  if (!el) return;
+  el.className = 'flow-node ' + (state === 'active' ? 'active' : state === 'done' ? 'done' : state === 'error' ? 'error' : '');
+  if (st) st.textContent = statusText;
+}
+
+// ── AI ANALYSIS (simulated) ────────────────────────────────────
+function addFakeAiAnalysis(logsArr) {
+  const errCount = logsArr.filter(l=>l.level==='ERROR').length;
+  const services = [...new Set(logsArr.map(l=>l.service))];
+  const severity = errCount >= 5 ? 'CRITICAL' : errCount >= 3 ? 'HIGH' : 'MEDIUM';
+
+  const summaries = [
+    `Issues detected across ${services.length} service(s).\n\n**Root cause hypothesis:** Cascading failure originating from ${services[0]} — upstream dependency unavailable causing timeout chain.\n\n**Recommended actions:**\n• Immediately check ${services[0]} health\n• Review connection pool settings\n• Enable circuit breaker if not active\n• Scale horizontally if load-related`,
+    `${errCount} critical errors in last cycle across ${services.join(', ')}.\n\n**Root cause hypothesis:** Likely database connection saturation causing downstream failures in payment and API layers.\n\n**Recommended actions:**\n• Check DB connection pool (current: likely exhausted)\n• Review slow query log\n• Consider read replica for SELECT queries\n• Restart affected services after DB stabilizes`,
+    `Anomaly pattern detected: ${services[0]} failures correlate with high latency.\n\n**Root cause hypothesis:** Memory pressure or GC pause causing request queuing.\n\n**Recommended actions:**\n• Monitor JVM heap if applicable\n• Check for memory leaks in recent deploy\n• Review last deployment diff\n• Consider rollback if issue persists > 5min`,
+  ];
+
+  const analysis = {
+    id: Date.now(),
+    time: new Date().toLocaleTimeString(),
+    severity,
+    errorCount: errCount,
+    services,
+    text: summaries[rnd(summaries.length)]
+  };
+
+  aiAnalyses.unshift(analysis);
+  renderAiCards();
+
+  document.getElementById('aiEmpty').style.display = 'none';
+  document.getElementById('aiThresholdHint').textContent = document.getElementById('cfgThreshold').value;
+}
+
+function renderAiCards() {
+  const container = document.getElementById('aiCards');
+  container.innerHTML = '';
+  aiAnalyses.slice(0,5).forEach(a => {
+    const card = document.createElement('div');
+    card.className = 'ai-card';
+    card.innerHTML = `
+      <div class="ai-card-header">
+        <span class="ai-card-title">⚡ AI Alert Analysis</span>
+        <span class="ai-card-time">${a.time}</span>
+      </div>
+      <div class="severity-badge sev-${a.severity}">${a.severity} — ${a.errorCount} errors</div>
+      <div class="ai-text">${a.text}</div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// ── TIMELINE ────────────────────────────────────────────────────
+function addTimeline(msg, type) {
+  timelineEvents.unshift({ time: new Date().toLocaleTimeString(), msg, type });
+  if (timelineEvents.length > 50) timelineEvents.pop();
+  renderTimeline();
+}
+
+function renderTimeline() {
+  const el = document.getElementById('timeline');
+  el.innerHTML = timelineEvents.slice(0,30).map(e => `
+    <div class="tl-item">
+      <span class="tl-time">${e.time}</span>
+      <span class="tl-msg tl-${e.type}">${e.msg}</span>
+    </div>
+  `).join('');
+}
+
+// ── LOG RENDERING ─────────────────────────────────────────────
+function addLog(log) {
+  logs.unshift(log);
+  if (logs.length > 500) logs.pop();
+
+  stats[log.level]++;
+  sourceCounts[log.service] = (sourceCounts[log.service] || 0) + 1;
+
+  logsLastMinute.push(Date.now());
+  logsLastMinute = logsLastMinute.filter(t => Date.now() - t < 60000);
+
+  updateStats();
+  renderLogs();
+  updateSourceCounts();
+}
+
+function renderLogs() {
+  const stream = document.getElementById('logStream');
+  const search = document.getElementById('searchInput').value.toLowerCase();
+
+  const filtered = logs.filter(l => {
+    if (currentFilter !== 'ALL' && l.level !== currentFilter) return false;
+    if (currentSource !== 'all' && l.service !== currentSource) return false;
+    if (search && !l.message.toLowerCase().includes(search) && !l.service.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  document.getElementById('emptyState').style.display = filtered.length ? 'none' : 'flex';
+  document.getElementById('visibleCount').textContent = `${filtered.length} events`;
+
+  const rows = filtered.slice(0, 200).map(l => `
+    <div class="log-row row-${l.level === 'ERROR' ? 'e' : l.level === 'WARNING' ? 'w' : 'i'}">
+      <span class="col-time">${l.timestamp.slice(11,19)}</span>
+      <span><span class="badge badge-${l.level}">${l.level}</span></span>
+      <span class="col-service">${l.service}</span>
+      <span class="col-message" title="${l.message}">${l.message}</span>
+      <span class="col-sent ${l.sent === 'ok' ? 'sent-ok' : l.sent === 'fail' ? 'sent-err' : 'sent-pending'}">
+        ${l.sent === 'ok' ? '✓ sent' : l.sent === 'fail' ? '✗ fail' : l.sent === 'pending' ? '…' : '—'}
+      </span>
+      <span class="col-id">#${l.id}</span>
+    </div>
+  `).join('');
+
+  stream.innerHTML = (filtered.length ? '' : '') + rows +
+    (filtered.length ? '' : document.getElementById('emptyState').outerHTML);
+
+  if (filtered.length === 0) {
+    document.getElementById('emptyState').style.display = 'flex';
+  }
+}
+
+function updateStats() {
+  document.getElementById('statTotal').textContent = logs.length;
+  document.getElementById('statError').textContent = stats.ERROR;
+  document.getElementById('statWarn').textContent = stats.WARNING;
+  document.getElementById('statInfo').textContent = stats.INFO;
+  document.getElementById('totalChip').textContent = logs.length + ' total';
+  document.getElementById('rateChip').textContent = logsLastMinute.length + ' logs/min';
+
+  updateThresholdBar();
+  updateAlertChip();
+}
+
+function updateThresholdBar() {
+  const threshold = parseInt(document.getElementById('cfgThreshold').value);
+  const pct = Math.min((stats.ERROR / threshold) * 100, 100);
+  const fill = document.getElementById('thresholdFill');
+  fill.style.width = pct + '%';
+  fill.style.background = pct >= 100 ? 'var(--red)' : pct > 66 ? 'var(--yellow)' : 'var(--green)';
+  document.getElementById('thresholdRatio').textContent = `${stats.ERROR}/${threshold}`;
+  document.getElementById('aiThresholdHint').textContent = threshold;
+}
+
+function updateAlertChip() {
+  const threshold = parseInt(document.getElementById('cfgThreshold').value);
+  const chip = document.getElementById('alertChip');
+  const icon = document.getElementById('alertChipIcon');
+  const text = document.getElementById('alertChipText');
+  if (stats.ERROR >= threshold) {
+    chip.className = 'alert-chip firing';
+    icon.textContent = '🚨';
+    text.textContent = `ALERT FIRING — ${stats.ERROR} errors`;
+  } else if (stats.ERROR > 0) {
+    chip.className = 'alert-chip';
+    icon.textContent = '⚠';
+    text.textContent = `${stats.ERROR} errors — watching`;
+  } else {
+    chip.className = 'alert-chip ok';
+    icon.textContent = '✓';
+    text.textContent = 'All systems normal';
+  }
+}
+
+function updateSourceCounts() {
+  document.getElementById('cnt-all').textContent = logs.length;
+  Object.keys(SOURCES).forEach(s => {
+    const el = document.getElementById('cnt-' + s);
+    if (el) el.textContent = sourceCounts[s] || 0;
+  });
+}
+
+// ── SIMULATION ───────────────────────────────────────────────
+async function generateAndSend() {
+  const log = makeLog();
+  addLog(log);
+  addTimeline(`${log.level} from ${log.service}`, log.level === 'ERROR' ? 'err' : log.level === 'WARNING' ? 'warn' : 'ok');
+
+  const status = await sendWebhook([log]);
+  log.sent = status ? 'ok' : (status === null ? '—' : 'fail');
+  renderLogs();
+}
+
+function startSim() {
+  if (!document.getElementById('webhookUrl').value.trim()) {
+    alert('⚠️ Please enter your n8n webhook URL first!');
+    document.getElementById('webhookUrl').focus();
+    return;
+  }
+  const sec = parseInt(document.getElementById('cfgInterval').value) * 1000;
+  simInterval = setInterval(generateAndSend, sec);
+  document.getElementById('btnStart').style.display = 'none';
+  document.getElementById('btnStop').style.display = 'flex';
+  document.getElementById('liveDot').style.background = 'var(--green)';
+  document.getElementById('liveLabel').textContent = 'LIVE';
+  document.getElementById('srcChip').textContent = 'source: simulator';
+  addTimeline('▶ Simulation started', 'ok');
+  generateAndSend();
+}
+
+function stopSim() {
+  clearInterval(simInterval);
+  simInterval = null;
+  document.getElementById('btnStart').style.display = 'flex';
+  document.getElementById('btnStop').style.display = 'none';
+  document.getElementById('liveDot').style.background = 'var(--text2)';
+  document.getElementById('liveLabel').textContent = 'IDLE';
+  addTimeline('■ Simulation stopped', 'warn');
+}
+
+async function injectLog(level) {
+  const log = makeLog(level);
+  addLog(log);
+  const status = await sendWebhook([log]);
+  log.sent = status ? 'ok' : (status === null ? '—' : 'fail');
+  renderLogs();
+}
+
+async function injectBatch() {
+  const batch = [makeLog('ERROR'), makeLog('ERROR'), makeLog('ERROR'), makeLog('WARNING'), makeLog('INFO')];
+  batch.forEach(l => addLog(l));
+  const status = await sendWebhook(batch);
+  batch.forEach(l => { l.sent = status ? 'ok' : (status === null ? '—' : 'fail'); });
+  renderLogs();
+  addTimeline('📦 Batch of 5 logs injected (3 ERRORs)', 'err');
+}
+
+// ── UI CONTROLS ───────────────────────────────────────────────
+function setFilter(lvl, btn) {
+  currentFilter = lvl;
+  ['fbAll','fbErr','fbWarn','fbInfo'].forEach(id => {
+    const el = document.getElementById(id);
+    el.className = 'filter-btn';
+  });
+  const map = {ALL:'active-all',ERROR:'active-e',WARNING:'active-w',INFO:'active-i'};
+  btn.className = 'filter-btn ' + map[lvl];
+  renderLogs();
+}
+
+function filterSource(src, el) {
+  currentSource = src;
+  document.querySelectorAll('.source-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  renderLogs();
+}
+
+function switchTab(tab) {
+  ['ai','flow','timeline'].forEach(t => {
+    document.getElementById('tab-'+t).className = 'rtab' + (t===tab?' active':'');
+    document.getElementById('content-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+}
+
+function clearAll() {
+  logs = [];
+  stats = {ERROR:0, WARNING:0, INFO:0};
+  sourceCounts = {};
+  logsLastMinute = [];
+  logIdCounter = 0;
+  updateStats();
+  updateSourceCounts();
+  document.getElementById('emptyState').style.display = 'flex';
+  renderLogs();
+  addTimeline('🗑 Logs cleared', 'warn');
+}
+
+// ── CLOCK ─────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Init
+renderLogs();
+</script>
+</body>
+</html>
