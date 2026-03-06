@@ -8,36 +8,29 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg0: #ffffff;
-  --bg1: #f6f8fa;
-  --bg2: #eef2f6;
-  --bg3: #e6ebf1;
-
-  --border: #d0d7de;
-  --border2: #c5ccd3;
-
-  --text0: #0d1117;
-  --text1: #57606a;
-  --text2: #8c959f;
-
-  --green: #2da44e;
-  --green-dim: rgba(45,164,78,0.12);
-
-  --yellow: #bf8700;
-  --yellow-dim: rgba(191,135,0,0.12);
-
-  --red: #cf222e;
-  --red-dim: rgba(207,34,46,0.12);
-
-  --blue: #0969da;
-  --blue-dim: rgba(9,105,218,0.10);
-
-  --orange: #bc4c00;
-  --purple: #8250df;
-
-  --accent: #0969da;
-  --accent-bright: #1f6feb;
+  --bg0: #080c10;
+  --bg1: #0d1117;
+  --bg2: #161b22;
+  --bg3: #1c2330;
+  --border: #21262d;
+  --border2: #30363d;
+  --text0: #e6edf3;
+  --text1: #8b949e;
+  --text2: #484f58;
+  --green: #3fb950;
+  --green-dim: rgba(63,185,80,0.12);
+  --yellow: #d29922;
+  --yellow-dim: rgba(210,153,34,0.12);
+  --red: #f85149;
+  --red-dim: rgba(248,81,73,0.12);
+  --blue: #58a6ff;
+  --blue-dim: rgba(88,166,255,0.10);
+  --orange: #e3b341;
+  --purple: #bc8cff;
+  --accent: #1f6feb;
+  --accent-bright: #388bfd;
 }
+
 * { margin:0; padding:0; box-sizing:border-box; }
 
 html, body {
@@ -470,7 +463,7 @@ html, body {
   grid-template-columns: 80px 68px 140px 1fr 80px 70px;
   gap: 0;
   padding: 4px 14px;
-  border-bottom: 1px solid rgba(0,0,0,0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
   font-size: 11px;
   line-height: 1.5;
   cursor: pointer;
@@ -1234,8 +1227,24 @@ function renderLogs() {
     return true;
   });
 
-  document.getElementById('emptyState').style.display = filtered.length ? 'none' : 'flex';
   document.getElementById('visibleCount').textContent = `${filtered.length} events`;
+
+  if (filtered.length === 0) {
+    stream.innerHTML = `
+      <div class="empty-state" id="emptyState">
+        <div class="empty-ascii">
+┌─────────────────────────────┐<br>
+│  No log events yet          │<br>
+│                             │<br>
+│  Configure your webhook     │<br>
+│  URL and press Start        │<br>
+│  — or inject logs manually  │<br>
+└─────────────────────────────┘
+        </div>
+        <div class="empty-hint">Powered by n8n + OpenAI</div>
+      </div>`;
+    return;
+  }
 
   const rows = filtered.slice(0, 200).map(l => `
     <div class="log-row row-${l.level === 'ERROR' ? 'e' : l.level === 'WARNING' ? 'w' : 'i'}">
@@ -1250,12 +1259,7 @@ function renderLogs() {
     </div>
   `).join('');
 
-  stream.innerHTML = (filtered.length ? '' : '') + rows +
-    (filtered.length ? '' : document.getElementById('emptyState').outerHTML);
-
-  if (filtered.length === 0) {
-    document.getElementById('emptyState').style.display = 'flex';
-  }
+  stream.innerHTML = rows;
 }
 
 function updateStats() {
@@ -1397,7 +1401,6 @@ function clearAll() {
   logIdCounter = 0;
   updateStats();
   updateSourceCounts();
-  document.getElementById('emptyState').style.display = 'flex';
   renderLogs();
   addTimeline('🗑 Logs cleared', 'warn');
 }
