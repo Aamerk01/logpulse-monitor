@@ -1,0 +1,438 @@
+{
+  "name": "Smart Log Analyzer with AI Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "bc3760f6-8ac9-4c9d-a0bb-a0c868ebcb34",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1040,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.shouldAlert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d6ed18a6-5570-4206-8df5-932e4080fe55",
+      "name": "Should Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -496,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "=json",
+        "specifyBody": "=json",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "jsonBody": "={{ JSON.stringify({ \"model\": \"llama-3.3-70b-versatile\", \"max_tokens\": 150, \"messages\": [{ \"role\": \"system\", \"content\": \"You are a DevOps assistant. Respond in exactly 4 lines, no markdown, no symbols, no bullet points:\\nISSUES: (one sentence)\\nROOT CAUSE: (one sentence)\\nACTION: (one sentence)\\nSEVERITY: CRITICAL or HIGH or MEDIUM or LOW\" }, { \"role\": \"user\", \"content\": \"Analyze these logs:\\n\\n\" + $('Code in JavaScript').item.json.logsText }] }) }}",
+        "options": {}
+      },
+      "id": "667a2b4d-8ff4-4c7f-a9e2-beaf26129125",
+      "name": "OpenAI — Analyze Logs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        32
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "mxwoBB4bo8shpbPF",
+          "name": "Authorization"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "aamerkhadija118@gmail.com",
+        "subject": "=={{ $('Format Email').item.json.subject }}",
+        "message": "=={{ $('Format Email').item.json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "f4a513c7-cb93-4319-a06b-a8c1d22d884d",
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        544,
+        80
+      ],
+      "webhookId": "be26637a-06a7-45fd-8c6a-67cb66a47ab6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FJK0Rg4PUeL0Fl3i",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "6ba5aed2-e4e6-4fb9-a694-8370b30168c7",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -832,
+        160
+      ],
+      "id": "62d9b2cb-03bd-409c-be47-90a7ff1b3e94",
+      "name": "Webhook",
+      "webhookId": "6ba5aed2-e4e6-4fb9-a694-8370b30168c7"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\n\nconst logs = raw.logs \n  || (raw.body && raw.body.logs) \n  || [];\n\nconst ERROR_THRESHOLD = 3;\nconst CRITICAL_KEYWORDS = ['database', 'payment', 'timeout', 'critical', 'fatal'];\n\nconst errorCount = Array.isArray(logs) \n  ? logs.filter(function(l) { return l.level === 'ERROR'; }).length \n  : 0;\n\nconst hasCritical = Array.isArray(logs) \n  ? logs.some(function(l) { \n      return CRITICAL_KEYWORDS.some(function(kw) { \n        return l.message && l.message.toLowerCase().indexOf(kw) !== -1; \n      }); \n    })\n  : false;\n\nconst logsText = Array.isArray(logs)\n  ? logs.map(function(l) { \n      return '[' + (l.service || 'app') + '] ' + l.level + ': ' + l.message; \n    }).join('\\n')\n  : 'No logs';\n\nconst debugRaw = JSON.stringify(raw);\n\nreturn [{\n  json: {\n    logs: logs,\n    logsText: logsText,\n    errorCount: errorCount,\n    hasCritical: hasCritical,\n    shouldAlert: errorCount >= ERROR_THRESHOLD || hasCritical,\n    threshold: ERROR_THRESHOLD,\n    debugRaw: debugRaw\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        160
+      ],
+      "id": "6407768b-23a4-4ad7-9eee-7b6a81a2a089",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3b7a69bb-e031-43dc-9bb9-e2ea40b5e20b",
+              "name": "severity",
+              "value": "={{ $('Code in JavaScript').item.json.errorCount >= 5 ? 'CRITICAL' : $('Code in JavaScript').item.json.errorCount >= 3 ? 'HIGH' : 'MEDIUM' }}",
+              "type": "string"
+            },
+            {
+              "id": "14e98a7e-539e-4e21-83ee-dd0660a09663",
+              "name": "alertTime",
+              "value": "={{ new Date().toLocaleString() }}",
+              "type": "string"
+            },
+            {
+              "id": "4de11815-79b5-42b0-b07a-5c31a7dd7f05",
+              "name": "errorCount",
+              "value": "={{ $('Code in JavaScript').item.json.errorCount }}",
+              "type": "string"
+            },
+            {
+              "id": "ec2c7a11-a33e-434d-9bde-2ff6eb11d063",
+              "name": "logsText",
+              "value": "={{ $('Code in JavaScript').item.json.logsText }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -320,
+        64
+      ],
+      "id": "17c60826-b663-4865-8d26-5bb18868b1b5",
+      "name": "Enrich Alert Data"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.severity }}",
+                    "rightValue": "CRITICAL",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "d5fe5563-146a-44c2-8622-fd6b3d77b2be"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "af669037-4789-4540-b596-8765366a5025",
+                    "leftValue": "={{ $json.severity }}",
+                    "rightValue": "HIGH",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cc6d3456-26fb-4dba-a05b-b4e12d22171c",
+                    "leftValue": "={{ $json.severity }}",
+                    "rightValue": "MEDIUM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -112,
+        48
+      ],
+      "id": "5522182e-7da2-4ef9-bab0-f5f9a4735d48",
+      "name": "Route by severity"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ai = $('OpenAI — Analyze Logs').item.json.choices[0].message.content;\nconst severity = $('Enrich Alert Data').item.json.severity;\nconst errorCount = $('Enrich Alert Data').item.json.errorCount;\nconst alertTime = $('Enrich Alert Data').item.json.alertTime;\nconst logsText = $('Enrich Alert Data').item.json.logsText;\n\nconst color = severity === 'CRITICAL' ? '#ff4444' : severity === 'HIGH' ? '#ff8800' : '#ffcc00';\n\nconst html = `<div style=\"font-family:monospace;max-width:580px;background:#0d1117;color:#e6edf3;padding:20px;border-radius:8px\">\n\n<div style=\"border-left:3px solid ${color};padding-left:12px;margin-bottom:16px\">\n  <span style=\"color:${color};font-weight:bold;font-size:16px\">⚡ ${severity} ALERT</span><br>\n  <span style=\"color:#8b949e;font-size:11px\">${alertTime}</span>\n</div>\n\n<table style=\"width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px\">\n  <tr style=\"background:#161b22\">\n    <td style=\"padding:6px 10px;color:#8b949e;border:1px solid #21262d\">Errors</td>\n    <td style=\"padding:6px 10px;color:#f85149;font-weight:bold;border:1px solid #21262d\">${errorCount}</td>\n  </tr>\n  <tr>\n    <td style=\"padding:6px 10px;color:#8b949e;border:1px solid #21262d\">Severity</td>\n    <td style=\"padding:6px 10px;color:${color};font-weight:bold;border:1px solid #21262d\">${severity}</td>\n  </tr>\n</table>\n\n<div style=\"background:#161b22;border:1px solid #21262d;border-radius:4px;padding:12px;margin-bottom:16px\">\n  <div style=\"color:#58a6ff;font-size:11px;font-weight:bold;margin-bottom:6px\">🤖 AI ANALYSIS</div>\n  <div style=\"color:#e6edf3;font-size:12px;line-height:1.7\">${ai}</div>\n</div>\n\n<div style=\"background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:12px\">\n  <div style=\"color:#3fb950;font-size:11px;font-weight:bold;margin-bottom:6px\">📋 LOGS</div>\n  <pre style=\"margin:0;color:#8b949e;font-size:10px;white-space:pre-wrap\">${logsText}</pre>\n</div>\n\n</div>`;\n\nreturn [{ json: { html, subject: `🚨 [${severity}] LogPulse — ${errorCount} errors detected` } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        32
+      ],
+      "id": "f1faa4ce-67b9-4a15-a343-b15ca45502aa",
+      "name": "Format Email"
+    },
+    {
+      "parameters": {},
+      "id": "2e80c3a2-09c8-4105-b8d4-f4eb35885587",
+      "name": "Log to console",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        208,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const errorCount = $('Code in JavaScript').item.json.errorCount;\nconst total = $('Code in JavaScript').item.json.logs.length;\nconst rate = total > 0 ? Math.round((errorCount / total) * 100) : 0;\n\nreturn [{ json: {\n  status: 'OK — No alert needed',\n  errorRate: rate + '%',\n  totalLogs: total,\n  checkedAt: new Date().toLocaleString()\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        352
+      ],
+      "id": "416537a3-271e-4307-baa0-d8b8c276c2a3",
+      "name": "Calculate Stats"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        []
+      ]
+    },
+    "Should Alert?": {
+      "main": [
+        [
+          {
+            "node": "Enrich Alert Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Calculate Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI — Analyze Logs": {
+      "main": [
+        [
+          {
+            "node": "Format Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Should Alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Alert Data": {
+      "main": [
+        [
+          {
+            "node": "Route by severity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by severity": {
+      "main": [
+        [
+          {
+            "node": "OpenAI — Analyze Logs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI — Analyze Logs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI — Analyze Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email": {
+      "main": [
+        [
+          {
+            "node": "Send Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Stats": {
+      "main": [
+        [
+          {
+            "node": "Log to console",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1185a947-9768-46b3-afb6-7a3eff38bb58",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7d58f2ae629a06ec9e29e87939eee46aab0771dd26c5fa0080959efbdf8720bc"
+  },
+  "id": "AieyTpXIYvK5pnKy",
+  "tags": []
+}
